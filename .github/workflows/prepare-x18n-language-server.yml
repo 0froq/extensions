@@ -1,0 +1,68 @@
+name: prepare x18n language server branch
+
+on:
+  push:
+    branches:
+      - x18n-language-server
+    paths:
+      - .github/workflows/prepare-x18n-language-server.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: x18n-language-server
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Register x18n from upstream main
+        env:
+          X18N_SHA: 97e7424f8eb0c81b1ffa83c9341c3f6df5fcfe2a
+        run: |
+          set -euo pipefail
+          git config user.name "0froq"
+          git config user.email "sayhola@froq.me"
+          git remote add upstream https://github.com/zed-industries/extensions.git
+          git fetch upstream main
+          git reset --hard upstream/main
+          git submodule add https://github.com/x18n-dev/x18n.git extensions/x18n-language-server
+          actual="$(git -C extensions/x18n-language-server rev-parse HEAD)"
+          if [ "$actual" != "$X18N_SHA" ]; then
+            git -C extensions/x18n-language-server fetch --depth 1 origin "$X18N_SHA"
+            git -C extensions/x18n-language-server checkout "$X18N_SHA"
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          ext = Path("extensions/x18n-language-server/packages/zed/extension.toml").read_text().splitlines()
+          values = {}
+          for line in ext:
+              if "=" not in line or line.startswith(" "):
+                  continue
+              key, value = line.split("=", 1)
+              values[key.strip()] = value.strip().strip('"')
+          if values.get("id") != "x18n-language-server":
+              raise SystemExit(f"unexpected id {values.get('id')}")
+          if values.get("version") != "0.1.6":
+              raise SystemExit(f"unexpected version {values.get('version')}")
+          path = Path("extensions.toml")
+          text = path.read_text()
+          if "[x18n-language-server]" not in text:
+              if not text.endswith("\n"):
+                  text += "\n"
+              text += "\n[x18n-language-server]\nsubmodule = \"extensions/x18n-language-server\"\npath = \"packages/zed\"\nversion = \"0.1.6\"\n"
+              path.write_text(text)
+          PY
+          corepack enable
+          corepack prepare pnpm@10.33.4 --activate
+          pnpm install --frozen-lockfile
+          pnpm sort-extensions
+          pnpm sort-extensions
+          git add extensions.toml .gitmodules extensions/x18n-language-server
+          git diff --cached --stat
+          git commit -m "Add x18n language server"
+          git push --force origin HEAD:refs/heads/x18n-language-server

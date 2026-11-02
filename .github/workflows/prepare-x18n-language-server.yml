@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  workflows: write
 
 jobs:
   prepare:
@@ -60,7 +61,6 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.33.4 --activate
           pnpm install --frozen-lockfile
-          pnpm sort-extensions
           pnpm sort-extensions
           git add extensions.toml .gitmodules extensions/x18n-language-server
           git diff --cached --stat

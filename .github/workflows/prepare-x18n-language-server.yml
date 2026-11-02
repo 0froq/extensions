@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  workflows: write
 
 jobs:
   prepare:
@@ -21,16 +20,16 @@ jobs:
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Register x18n from upstream main
+      - name: Register x18n on a branch from upstream main
         env:
-          X18N_SHA: 97e7424f8eb0c81b1ffa83c9341c3f6df5fcfe2a
+          X18N_SHA: 916beea11c6c29f641b08651e8a6def04e56c01b
         run: |
           set -euo pipefail
           git config user.name "0froq"
           git config user.email "sayhola@froq.me"
           git remote add upstream https://github.com/zed-industries/extensions.git
-          git fetch upstream main
-          git reset --hard upstream/main
+          git fetch --no-tags upstream main
+          git checkout --detach upstream/main
           git submodule add https://github.com/x18n-dev/x18n.git extensions/x18n-language-server
           actual="$(git -C extensions/x18n-language-server rev-parse HEAD)"
           if [ "$actual" != "$X18N_SHA" ]; then
@@ -65,4 +64,4 @@ jobs:
           git add extensions.toml .gitmodules extensions/x18n-language-server
           git diff --cached --stat
           git commit -m "Add x18n language server"
-          git push --force origin HEAD:refs/heads/x18n-language-server
+          git push origin HEAD:refs/heads/add-x18n-language-server
